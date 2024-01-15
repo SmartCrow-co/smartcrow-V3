@@ -10,9 +10,9 @@ contract SenderFundsContract is Ownable {
         uint256 bonusAmount;
         uint256 startDate;
         uint256 sellByDate;
-        bool propertySold;
-        bool haveExpectedSalesPrice;
-        uint256 expectedSalesPrice;
+        bool atOrAbove;
+        bool atOrBelow;
+        uint256 atPrice;
         bool meetSalesCondition;
         bool postDeadlineCheck;
         bool fundsWithdrawn;
@@ -26,30 +26,52 @@ contract SenderFundsContract is Ownable {
     function createSenderFund(
         address Receiver,
         string memory propertyNumber,
-        uint256 startDateInDays,
-        uint256 sellByDateInDays,
-        bool haveExpectedSalesPrice,
-        uint256 expectedSalesPrice
+        uint256 startDateInUnixSeconds,
+        uint256 sellByDateInUnixSeconds, 
+        bool atOrAbove,
+        bool atOrBelow,
+        uint256 atPrice
     ) public payable {
-        require(msg.value >= 0, "Deposit amount must be greater or equal to bonus amount");
-        require(msg.sender != Receiver, "You cannot be the Receiver yourself");
+     require(msg.value >= 0, "Deposit amount must be greater or equal to bonus amount");
+     require(msg.sender != Receiver, "You cannot be the Receiver yourself");
+    require(!(atOrAbove && atOrBelow), "Both atOrAbove and atOrBelow cannot be true simultaneously");
+    require(sellByDateInUnixSeconds > startDateInUnixSeconds, "End date must be greater than start date");
 
-        // Add require statement to check if funds have been withdrawn
-        require(bonusInfo[msg.sender][Receiver][propertyNumber].fundsWithdrawn, "Funds must be withdrawn before creating a new BonusInfo");
-
+    // Check if BonusInfo already exists
+    if (bonusInfo[msg.sender][Receiver][propertyNumber].Sender == address(0)) {
+        // If BonusInfo does not exist, proceed with the creation
         bonusInfo[msg.sender][Receiver][propertyNumber] = BonusInfo({
             Sender: msg.sender,
             Receiver: Receiver,
             bonusAmount: msg.value,
-            startDate: startDateInDays,
-            sellByDate: sellByDateInDays,
-            propertySold: false,
-            haveExpectedSalesPrice: haveExpectedSalesPrice,
-            expectedSalesPrice: expectedSalesPrice,
+            startDate: startDateInUnixSeconds,
+            sellByDate: sellByDateInUnixSeconds,
+            atOrAbove: atOrAbove,
+            atOrBelow: atOrBelow,
+            atPrice: atPrice,
             meetSalesCondition: false,
             postDeadlineCheck: false,
-            fundsWithdrawn:false
+            fundsWithdrawn: false
         });
+    } else {
+        // Inner require statement to check fundsWithdrawn condition
+        require(bonusInfo[msg.sender][Receiver][propertyNumber].fundsWithdrawn, "Funds must be withdrawn before creating a new BonusInfo");
+
+        // Can create new contract if funds are withdrawn
+        bonusInfo[msg.sender][Receiver][propertyNumber] = BonusInfo({
+            Sender: msg.sender,
+            Receiver: Receiver,
+            bonusAmount: msg.value,
+            startDate: startDateInUnixSeconds,
+            sellByDate: sellByDateInUnixSeconds,
+            atOrAbove: atOrAbove,
+            atOrBelow: atOrBelow,
+            atPrice: atPrice,
+            meetSalesCondition: false,
+            postDeadlineCheck: false,
+            fundsWithdrawn: false
+        });
+    }
     }
 
     // For Sender
@@ -58,7 +80,6 @@ contract SenderFundsContract is Ownable {
         BonusInfo storage info = bonusInfo[msg.sender][Receiver][propertyNumber];
         require(info.Sender != address(0), "No active bonus for this sender.");
         require(!info.fundsWithdrawn, "The bonus has already been paid out.");
-        require(!info.propertySold, "The bonus has already been paid out.");
         require(info.postDeadlineCheck, "Post deadline check not performed.");
         require(!info.meetSalesCondition, "The sales conditions are met for Receiver.");
 
@@ -72,7 +93,6 @@ contract SenderFundsContract is Ownable {
         BonusInfo storage info = bonusInfo[msg.sender][Receiver][propertyNumber];
         require(info.Receiver != address(0), "No active bonus for this sender.");
         require(!info.fundsWithdrawn, "The bonus has already been paid out.");
-        require(!info.propertySold, "The property has already been sold.");
         require(info.meetSalesCondition,"Sales condition isn't met");
 
         payable(info.Receiver).transfer(info.bonusAmount);
@@ -84,14 +104,12 @@ contract SenderFundsContract is Ownable {
         address sender,
         address receiver,
         string memory propertyNumber,
-        bool propertySold,
         bool meetSalesCondition,
         bool postDeadlineCheck
     ) external onlyOwner {
         BonusInfo storage info = bonusInfo[sender][receiver][propertyNumber];
         require(info.Sender != address(0), "No active bonus for this sender.");
 
-        info.propertySold = propertySold;
         info.meetSalesCondition = meetSalesCondition;
         info.postDeadlineCheck = postDeadlineCheck;
     }
