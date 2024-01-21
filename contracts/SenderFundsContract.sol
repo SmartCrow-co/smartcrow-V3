@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract SenderFundsContract is Ownable {
     struct BonusInfo {
-        address Sender;
-        address Receiver;
+        address sender;
+        address receiver;
         uint256 bonusAmount;
         uint256 startDate;
         uint256 sellByDate;
@@ -16,90 +17,99 @@ contract SenderFundsContract is Ownable {
         bool meetSalesCondition;
         bool postDeadlineCheck;
         bool fundsWithdrawn;
+        address token; // Token address
     }
 
     mapping(address => mapping(address => mapping(string => BonusInfo))) public bonusInfo;
 
-    constructor() Ownable(msg.sender) {} // Pass msg.sender as the initial owner
+    ERC20 public usdtToken;
+    ERC20 public usdcToken;
+    ERC20 public wbtcToken;
 
-    // Create a new bonus with an expected sales price
-    function createSenderFund(
-        address Receiver,
+    constructor(
+        address _usdtToken,
+        address _usdcToken,
+        address _wbtcToken
+    ) Ownable(msg.sender) {
+        usdtToken = ERC20(_usdtToken);
+        usdcToken = ERC20(_usdcToken);
+        wbtcToken = ERC20(_wbtcToken);
+    }
+
+    function createBonusInfo(
+        address receiver,
         string memory propertyNumber,
         uint256 startDateInUnixSeconds,
-        uint256 sellByDateInUnixSeconds, 
+        uint256 sellByDateInUnixSeconds,
         bool atOrAbove,
         bool atOrBelow,
-        uint256 atPrice
-    ) public payable {
-     require(msg.value >= 0, "Deposit amount must be greater or equal to bonus amount");
-     require(msg.sender != Receiver, "You cannot be the Receiver yourself");
-    require(!(atOrAbove && atOrBelow), "Both atOrAbove and atOrBelow cannot be true simultaneously");
-    require(sellByDateInUnixSeconds > startDateInUnixSeconds, "End date must be greater than start date");
+        uint256 atPrice,
+        uint256 bonusAmount,
+        address token
+    ) external payable {
+        // Ensure that only specific tokens are allowed
+        require(
+            (token == address(usdtToken) || token == address(usdcToken) || token == address(wbtcToken)) ||
+            (token == address(0) && msg.value == bonusAmount),
+            "Unsupported token or insufficient native funds"
+        );
 
-    // Check if BonusInfo already exists
-    if (bonusInfo[msg.sender][Receiver][propertyNumber].Sender == address(0)) {
-        // If BonusInfo does not exist, proceed with the creation
-        bonusInfo[msg.sender][Receiver][propertyNumber] = BonusInfo({
-            Sender: msg.sender,
-            Receiver: Receiver,
-            bonusAmount: msg.value,
-            startDate: startDateInUnixSeconds,
-            sellByDate: sellByDateInUnixSeconds,
-            atOrAbove: atOrAbove,
-            atOrBelow: atOrBelow,
-            atPrice: atPrice,
-            meetSalesCondition: false,
-            postDeadlineCheck: false,
-            fundsWithdrawn: false
-        });
-    } else {
-        // Inner require statement to check fundsWithdrawn condition
-        require(bonusInfo[msg.sender][Receiver][propertyNumber].fundsWithdrawn, "Funds must be withdrawn before creating a new BonusInfo");
+        // Use transferFrom to handle token deposits
+        if (token != address(0)) {
+            require(ERC20(token).transferFrom(msg.sender, address(this), bonusAmount), "Token transfer failed");
+        }
 
-        // Can create new contract if funds are withdrawn
-        bonusInfo[msg.sender][Receiver][propertyNumber] = BonusInfo({
-            Sender: msg.sender,
-            Receiver: Receiver,
-            bonusAmount: msg.value,
-            startDate: startDateInUnixSeconds,
-            sellByDate: sellByDateInUnixSeconds,
-            atOrAbove: atOrAbove,
-            atOrBelow: atOrBelow,
-            atPrice: atPrice,
-            meetSalesCondition: false,
-            postDeadlineCheck: false,
-            fundsWithdrawn: false
-        });
-    }
+        require(msg.sender != receiver, "You cannot be the receiver yourself");
+        require(!(atOrAbove && atOrBelow), "Both atOrAbove and atOrBelow cannot be true simultaneously");
+        require(sellByDateInUnixSeconds > startDateInUnixSeconds, "End date must be greater than start date");
+
+        BonusInfo storage info = bonusInfo[msg.sender][receiver][propertyNumber];
+
+        // Check if BonusInfo already exists
+        require(info.sender == address(0) || info.fundsWithdrawn, "Either bonus info doesn't exist or Funds must be withdrawn before creating a new BonusInfo");
+
+        // If BonusInfo does not exist or funds are withdrawn, proceed with the creation
+        setBonusInfo(
+            msg.sender,
+            receiver,
+            propertyNumber,
+            (token == address(0)) ? msg.value : bonusAmount,
+            startDateInUnixSeconds,
+            sellByDateInUnixSeconds,
+            atOrAbove,
+            atOrBelow,
+            atPrice,
+            token
+        );
     }
 
-    // For Sender
-    // Withdraw funds after the deadline
-    function withdrawFundsSender(address Receiver, string memory propertyNumber) external onlyOwner {
-        BonusInfo storage info = bonusInfo[msg.sender][Receiver][propertyNumber];
-        require(info.Sender != address(0), "No active bonus for this sender.");
+    function withdrawFundsSender(address Sender,address Receiver, string memory propertyNumber) external  {
+        BonusInfo storage info = bonusInfo[Sender][Receiver][propertyNumber];
+        require(info.sender != address(0), "No active bonus for this sender.");
         require(!info.fundsWithdrawn, "The bonus has already been paid out.");
         require(info.postDeadlineCheck, "Post deadline check not performed.");
         require(!info.meetSalesCondition, "The sales conditions are met for Receiver.");
 
-        payable(info.Sender).transfer(info.bonusAmount);
-        info.fundsWithdrawn=true;
+        if(info.token==address(0)){
+            payable(info.sender).transfer(info.bonusAmount);
+        }
+        else{ERC20(info.token).transfer(info.sender, info.bonusAmount);} // Withdraw the deposited token
+        info.fundsWithdrawn = true;
     }
 
-    // For Receiver
-    // Withdraw funds after the deadline
-    function withdrawFundsReceiver(address Receiver, string memory propertyNumber) external onlyOwner {
-        BonusInfo storage info = bonusInfo[msg.sender][Receiver][propertyNumber];
-        require(info.Receiver != address(0), "No active bonus for this sender.");
+    function withdrawFundsReceiver(address Sender,address Receiver, string memory propertyNumber) external  {
+        BonusInfo storage info = bonusInfo[Sender][Receiver][propertyNumber];
+        require(info.receiver != address(0), "No active bonus for this sender.");
         require(!info.fundsWithdrawn, "The bonus has already been paid out.");
-        require(info.meetSalesCondition,"Sales condition isn't met");
+        require(info.meetSalesCondition, "Sales condition isn't met");
 
-        payable(info.Receiver).transfer(info.bonusAmount);
-        info.fundsWithdrawn=true;
+        if(info.token==address(0)){
+            payable(info.receiver).transfer(info.bonusAmount);
+        }
+        else{ERC20(info.token).transfer(info.receiver, info.bonusAmount);} // Withdraw the deposited token
+        info.fundsWithdrawn = true;
     }
 
-    // Function to update BonusInfo's properties
     function updateBonusInfo(
         address sender,
         address receiver,
@@ -108,12 +118,39 @@ contract SenderFundsContract is Ownable {
         bool postDeadlineCheck
     ) external onlyOwner {
         BonusInfo storage info = bonusInfo[sender][receiver][propertyNumber];
-        require(info.Sender != address(0), "No active bonus for this sender.");
+        require(info.sender != address(0), "No active bonus for this sender.");
 
         info.meetSalesCondition = meetSalesCondition;
         info.postDeadlineCheck = postDeadlineCheck;
     }
 
-    receive() external payable {
+    function setBonusInfo(
+        address sender,
+        address receiver,
+        string memory propertyNumber,
+        uint256 bonusAmount,
+        uint256 startDateInUnixSeconds,
+        uint256 sellByDateInUnixSeconds,
+        bool atOrAbove,
+        bool atOrBelow,
+        uint256 atPrice,
+        address token
+    ) internal {
+        bonusInfo[sender][receiver][propertyNumber] = BonusInfo({
+            sender: sender,
+            receiver: receiver,
+            bonusAmount: bonusAmount,
+            startDate: startDateInUnixSeconds,
+            sellByDate: sellByDateInUnixSeconds,
+            atOrAbove: atOrAbove,
+            atOrBelow: atOrBelow,
+            atPrice: atPrice,
+            meetSalesCondition: false,
+            postDeadlineCheck: false,
+            fundsWithdrawn: false,
+            token: token
+        });
     }
+
+    receive() external payable {}
 }
