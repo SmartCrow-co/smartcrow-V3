@@ -117,6 +117,16 @@ npm install
 
 # Usage
 
+## Quick Usage
+
+```
+npx hardhat run scripts/deployment/main.js --network goerli
+```
+
+```
+npx hardhat verify --network goerli <CONTRACT_ADDRESS> <CONSTRUCTOR_ARG_1> <CONSTRUCTOR_ARG_2> <CONSTRUCTOR_ARG_3> <CONSTRUCTOR_ARG_4> <CONSTRUCTOR_ARG_5>
+```
+
 If you run `npx hardhat --help` you'll get an output of all the tasks you can run. 
 
 ## Deploying Contracts
