@@ -50,11 +50,34 @@ contract SenderFundsContract is Ownable, PullPayment, ReentrancyGuard {
         wbtcToken = IERC20(_wbtcToken);
         daiToken = IERC20(_daiToken);
         wethToken = IERC20(_wethToken);
+        usdtToken.approve(address(this), type(uint256).max);
+        usdcToken.approve(address(this), type(uint256).max);
+        wbtcToken.approve(address(this), type(uint256).max);
+        daiToken.approve(address(this), type(uint256).max);
+        wethToken.approve(address(this), type(uint256).max);
     }
 
-    function tokenApprove(address token, uint256 amount) external onlyOwner {
-        IERC20(token).approve(address(this), amount);
+    function tokenApproveUSDT() external onlyOwner {
+        usdtToken.approve(address(this), type(uint256).max);
     }
+
+    function tokenApproveUSDC() external onlyOwner {
+        usdcToken.approve(address(this), type(uint256).max);
+    }
+
+    function tokenApproveWBTC() external onlyOwner {
+        wbtcToken.approve(address(this), type(uint256).max);
+    }
+
+    function tokenApproveDAI() external onlyOwner {
+        daiToken.approve(address(this), type(uint256).max);
+    }
+
+    function tokenApproveWETH() external onlyOwner {
+        wethToken.approve(address(this), type(uint256).max);
+    }
+
+    
 
     function createBonusInfo(
         address receiver,
