@@ -104,3 +104,4 @@ contracts/test/fuzzing/crytic-export
 
 test/
 package-lock.json
+text

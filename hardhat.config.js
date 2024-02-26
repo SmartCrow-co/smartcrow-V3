@@ -18,6 +18,10 @@ const MAINNET_RPC_URL =
     "https://eth-mainnet.alchemyapi.io/v2/your-api-key"
 const POLYGON_MAINNET_RPC_URL =
     process.env.POLYGON_MAINNET_RPC_URL || "https://polygon-mainnet.alchemyapi.io/v2/your-api-key"
+const POLYGON_ZKEVM_MAINNET_RPC_URL = 
+    process.env.POLYGON_ZKEVM_MAINNET_RPC_URL; 
+const OPTIMISM_MAINNET_RPC_URL = 
+    process.env.OPTIMISM_MAINNET_RPC_URL; 
 const SEPOLIA_RPC_URL =
     process.env.SEPOLIA_RPC_URL;
 const GOERLI_RPC_URL =
@@ -32,6 +36,7 @@ const FORKING_BLOCK_NUMBER = parseInt(process.env.FORKING_BLOCK_NUMBER) || 0
 // Your API key for Etherscan, obtain one at https://etherscan.io/
 const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY || "Your etherscan API key"
 const POLYGONSCAN_API_KEY = process.env.POLYGONSCAN_API_KEY || "Your polygonscan API key"
+const OPTIMISM_API_KEY = process.env.OPTIMISM_API_KEY || "Your Optimism API Key";
 const REPORT_GAS = process.env.REPORT_GAS || false
 
 /** @type import('hardhat/config').HardhatUserConfig */
@@ -95,6 +100,16 @@ module.exports = {
             accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
             chainId: 137,
         },
+        polygonzkevm: {
+            url: POLYGON_ZKEVM_MAINNET_RPC_URL,
+            accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
+            chainId: 1101,
+        },
+        optimism: {
+            url: OPTIMISM_MAINNET_RPC_URL,
+            accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
+            chainId: 10,
+        },
         mumbai: {
             url: MUMBAI_RPC_URL,
             accounts: PRIVATE_KEY !== undefined ? [PRIVATE_KEY] : [],
@@ -111,6 +126,8 @@ module.exports = {
             mainnet: ETHERSCAN_API_KEY,
             polygon: POLYGONSCAN_API_KEY,
             polygonMumbai: POLYGONSCAN_API_KEY,
+            polygonzkevm: POLYGONSCAN_API_KEY,
+            optimism: OPTIMISM_API_KEY
         },
     },
     gasReporter: {

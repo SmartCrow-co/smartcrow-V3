@@ -45,6 +45,16 @@ const networkConfig = {
         fee: "100000000000000",
         fundAmount: "100000000000000",
     },
+    1101: {
+        name: "polygonzkevm",
+        fee: "100000000000000",
+        fundAmount: "100000000000000",
+    },
+    10: {
+        name: "optimism",
+        fee: "100000000000000",
+        fundAmount: "100000000000000",
+    },
     80001: {
         name: "mumbai",
         linkToken: "0x326C977E6efc84E512bB9C30f76E30c160eD06FB",
